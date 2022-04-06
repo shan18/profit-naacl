@@ -1,0 +1,10 @@
+dataset/
+.vscode
+__pycache__
+.ipynb_checkpoints
+data/price
+data/stock
+data/tweet
+*.ipynb
+*.pkl
+*.csv
