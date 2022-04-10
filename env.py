@@ -1,7 +1,8 @@
-from configs_stock import *
+from configs_stock import (
+    STOCK_DIM, FEAT_DIMS, HOLDING_IDX, EMB_IDX, INITIAL_ACCOUNT_BALANCE, TARGET_IDX,
+    TIME_IDX, LAST_PRICE_IDX, TRANSACTION_FEE_PERCENT, REWARD_SCALING, HMAX_NORMALIZE
+)
 from empyrical import sharpe_ratio, max_drawdown, calmar_ratio, sortino_ratio
-import pyfolio
-import pickle
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -12,6 +13,7 @@ import matplotlib
 import os
 
 matplotlib.use("Agg")
+
 
 class StockEnvTrade(gym.Env):
     """A stock trading environment for OpenAI gym"""
@@ -55,11 +57,6 @@ class StockEnvTrade(gym.Env):
         target_price = self.data["adj_close_target"].view(-1).tolist()
         len_data = self.data["length_data"].view(-1).tolist()
         emb_data = self.data["embedding"].view(-1).tolist()
-        text_diff = self.data["text_difficulty"].view(-1).tolist()
-        vol_diff = self.data["volatility"].view(-1).tolist()
-        price_text_diff = self.data["price_text_difficulty"].view(-1).tolist()
-        price_diff = self.data["price_difficulty"].view(-1).tolist()
-        all_diff = self.data["price_text_vol_difficulty"].view(-1).tolist()
         time_feats = self.data["time_features"].view(-1).tolist()
         self.state = (
             [INITIAL_ACCOUNT_BALANCE]  # balance
@@ -68,11 +65,6 @@ class StockEnvTrade(gym.Env):
             + emb_data  # tweet features
             + len_data  # tweet len
             + target_price  # target price
-            + price_diff
-            + vol_diff
-            + text_diff
-            + price_text_diff
-            + all_diff
             + time_feats
         )
         # initialize reward
@@ -111,8 +103,6 @@ class StockEnvTrade(gym.Env):
                     * TRANSACTION_FEE_PERCENT
                 )
                 self.trades += 1
-            else:
-                pass
         else:
             # if turbulence goes over threshold, just clear out all positions
             if self.state[index + STOCK_DIM + 1] > 0:
@@ -179,8 +169,7 @@ class StockEnvTrade(gym.Env):
                 )
             )
             end_total_asset = self.state[0] + sum(
-                np.array(self.state[HOLDING_IDX:EMB_IDX])
-                * np.array(self.state[TARGET_IDX:PRICEDIFF_IDX])
+                np.array(self.state[HOLDING_IDX:EMB_IDX]) * np.array(self.state[TARGET_IDX:TIME_IDX])
             )
             print("previous_total_asset:{}".format(self.asset_memory[0]))
 
@@ -201,11 +190,7 @@ class StockEnvTrade(gym.Env):
             mdd = max_drawdown(df_total_value["daily_return"]) * 100
 
             df_rewards = pd.DataFrame(self.rewards_memory)
-            df_rewards.to_csv(
-                "results/account_rewards_trade_{}_{}.csv".format(
-                    self.model_name, self.iteration
-                )
-            )
+            df_rewards.to_csv(f"results/account_rewards_trade_{self.model_name}_{self.iteration}.csv")
 
             return (
                 self.state,
@@ -233,59 +218,26 @@ class StockEnvTrade(gym.Env):
             begin_total_asset = np.array(self.state[HOLDING_IDX:EMB_IDX]) * np.array(
                 self.state[LAST_PRICE_IDX:HOLDING_IDX]
             )
+
             for index in sell_index:
-                # print('take sell action'.format(actions[index]))
-                self._sell_stock(index, actions[index])
+                if self.state[index + 1] > 0:  # if 0 then hold the stocks
+                    # print('take sell action'.format(actions[index]))
+                    self._sell_stock(index, actions[index])
 
             for index in buy_index:
-                # print('take buy action: {}'.format(actions[index]))
-                self._buy_stock(index, actions[index])
+                if self.state[index + 1] > 0:  # if 0 then hold the stocks
+                    # print('take buy action: {}'.format(actions[index]))
+                    self._buy_stock(index, actions[index])
 
             end_total_asset = np.array(self.state[HOLDING_IDX:EMB_IDX]) * np.array(
-                self.state[TARGET_IDX:PRICEDIFF_IDX]
+                self.state[TARGET_IDX:TIME_IDX]
             )
 
             self.asset_memory.append(self.state[0] + sum(end_total_asset))
 
-            if self.args.diff == "price":
-                self.reward = sum(
-                    (end_total_asset - begin_total_asset)
-                    * np.array(self.state[PRICEDIFF_IDX:VOLDIFF_IDX])
-                )
-                self.rewards_memory.append(self.reward)
-                self.reward = self.reward * REWARD_SCALING
-            elif self.args.diff == "vol":
-                self.reward = sum(
-                    (end_total_asset - begin_total_asset)
-                    * np.array(self.state[VOLDIFF_IDX:TEXTDIFF_IDX])
-                )
-                self.rewards_memory.append(self.reward)
-                self.reward = self.reward * REWARD_SCALING
-            elif self.args.diff == "text":
-                self.reward = sum(
-                    (end_total_asset - begin_total_asset)
-                    * np.array(self.state[TEXTDIFF_IDX:PRICE_TEXT_DIFF_IDX])
-                )
-                self.rewards_memory.append(self.reward)
-                self.reward = self.reward * REWARD_SCALING
-            elif self.args.diff == "price_text":
-                self.reward = sum(
-                    (end_total_asset - begin_total_asset)
-                    * np.array(self.state[PRICE_TEXT_DIFF_IDX:ALLDIFF_IDX])
-                )
-                self.rewards_memory.append(self.reward)
-                self.reward = self.reward * REWARD_SCALING
-            elif self.args.diff == "pvt":
-                self.reward = sum(
-                    (end_total_asset - begin_total_asset)
-                    * np.array(self.state[ALLDIFF_IDX:TIME_IDX])
-                )
-                self.rewards_memory.append(self.reward)
-                self.reward = self.reward * REWARD_SCALING
-            else:
-                self.reward = sum(end_total_asset - begin_total_asset)
-                self.rewards_memory.append(self.reward)
-                self.reward = self.reward * REWARD_SCALING
+            self.reward = sum(end_total_asset - begin_total_asset)
+            self.rewards_memory.append(self.reward)
+            self.reward = self.reward * REWARD_SCALING
 
             self.day += 1
             self.data = self.all_data[self.day]
@@ -294,11 +246,6 @@ class StockEnvTrade(gym.Env):
             target_price = self.data["adj_close_target"].view(-1).tolist()
             len_data = self.data["length_data"].view(-1).tolist()
             emb_data = self.data["embedding"].view(-1).tolist()
-            text_diff = self.data["text_difficulty"].view(-1).tolist()
-            vol_diff = self.data["volatility"].view(-1).tolist()
-            price_text_diff = self.data["price_text_difficulty"].view(-1).tolist()
-            price_diff = self.data["price_difficulty"].view(-1).tolist()
-            all_diff = self.data["price_text_vol_difficulty"].view(-1).tolist()
             time_feats = self.data["time_features"].view(-1).tolist()
             self.state = (
                 [self.state[0]]  # balance
@@ -307,11 +254,6 @@ class StockEnvTrade(gym.Env):
                 + emb_data  # tweet features
                 + len_data  # tweet len
                 + target_price  # target price
-                + price_diff
-                + vol_diff
-                + text_diff
-                + price_text_diff
-                + all_diff
                 + time_feats
             )
 
@@ -333,11 +275,6 @@ class StockEnvTrade(gym.Env):
             target_price = self.data["adj_close_target"].view(-1).tolist()
             len_data = self.data["length_data"].view(-1).tolist()
             emb_data = self.data["embedding"].view(-1).tolist()
-            text_diff = self.data["text_difficulty"].view(-1).tolist()
-            vol_diff = self.data["volatility"].view(-1).tolist()
-            price_text_diff = self.data["price_text_difficulty"].view(-1).tolist()
-            price_diff = self.data["price_difficulty"].view(-1).tolist()
-            all_diff = self.data["price_text_vol_difficulty"].view(-1).tolist()
             time_feats = self.data["time_features"].view(-1).tolist()
             self.state = (
                 [INITIAL_ACCOUNT_BALANCE]  # balance
@@ -346,11 +283,6 @@ class StockEnvTrade(gym.Env):
                 + emb_data  # tweet features
                 + len_data  # tweet len
                 + target_price  # target price
-                + price_diff
-                + vol_diff
-                + text_diff
-                + price_text_diff
-                + all_diff
                 + time_feats
             )
         else:
@@ -372,11 +304,6 @@ class StockEnvTrade(gym.Env):
             target_price = self.data["adj_close_target"].view(-1).tolist()
             len_data = self.data["length_data"].view(-1).tolist()
             emb_data = self.data["embedding"].view(-1).tolist()
-            text_diff = self.data["text_difficulty"].view(-1).tolist()
-            vol_diff = self.data["volatility"].view(-1).tolist()
-            price_text_diff = self.data["price_text_difficulty"].view(-1).tolist()
-            price_diff = self.data["price_difficulty"].view(-1).tolist()
-            all_diff = self.data["price_text_vol_difficulty"].view(-1).tolist()
             time_feats = self.data["time_features"].view(-1).tolist()
             self.state = (
                 [self.previous_state[0]]  # balance
@@ -386,11 +313,6 @@ class StockEnvTrade(gym.Env):
                 + emb_data  # tweet features
                 + len_data  # tweet len
                 + target_price  # target price
-                + price_diff
-                + vol_diff
-                + text_diff
-                + price_text_diff
-                + all_diff
                 + time_feats
             )
 

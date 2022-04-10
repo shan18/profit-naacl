@@ -8,3 +8,5 @@ data/tweet
 *.ipynb
 *.pkl
 *.csv
+data/data_archive
+results/

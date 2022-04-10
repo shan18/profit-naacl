@@ -1,4 +1,3 @@
-from __future__ import absolute_import
 from collections import deque, namedtuple
 import warnings
 import random
@@ -11,7 +10,7 @@ Experience = namedtuple("Experience", "state0, action, reward, state1, terminal1
 def sample_batch_indexes(low, high, size):
     if high - low >= size:
         try:
-            r = xrange(low, high)
+            r = range(low, high)
         except NameError:
             r = range(low, high)
         batch_idxs = random.sample(r, size)

@@ -1,8 +1,10 @@
+import os
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.io import savemat
 import pickle as pkl
-from util import *
+
+from util import prYellow
+
 
 class Evaluator(object):
     def __init__(self, num_episodes, interval, save_path="", max_episode_length=None):

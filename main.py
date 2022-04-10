@@ -1,15 +1,13 @@
-import numpy as np
 import argparse
 from copy import deepcopy
-import torch
-import gym
 import pickle
 from env import StockEnvTrade
 from evaluator import Evaluator
 from ddpg import DDPG
-from util import *
+from util import get_output_folder, prGreen, prYellow
 from tqdm import tqdm
 import os
+
 
 def train(
     num_iterations,
@@ -61,7 +59,7 @@ def train(
 
         # [optional] evaluate
         if evaluate is not None and validate_steps > 0 and step % validate_steps == 0:
-            print("VALIDATING!!! step = ", step)
+            print('VALIDATING!!! step = ', step)
             agent.is_training = False
             agent.eval()
             policy = lambda x: agent.select_action(x, decay_epsilon=False)
@@ -79,7 +77,7 @@ def train(
             agent.is_training = True
 
             print(
-                "[Evaluate] Step_{:07d}: mean_reward:{} mean_sharpe:{} mean_sortino:{} mean_calmar:{} mean_mdd:{} mean_cum_returns:{}".format(
+                '[Evaluate] Step_{:07d}: mean_reward:{} mean_sharpe:{} mean_sortino:{} mean_calmar:{} mean_mdd:{} mean_cum_returns:{}'.format(
                     step,
                     validate_reward,
                     validate_sharpe,
@@ -90,7 +88,7 @@ def train(
                 )
             )
             if validate_sharpe > best_sharpe:
-                print("saving model!!!!")
+                print('saving model!!!!')
                 best_sharpe = validate_sharpe
                 best_reward = validate_reward
                 best_sortino = validate_sortino
@@ -98,12 +96,12 @@ def train(
                 best_mdd = validate_mdd
                 best_cum_returns = validate_cum_returns
                 agent.save_model(output)
-                if not os.path.exists(os.path.join(output, "validate_reward")):
-                    os.makedirs(os.path.join(output, "validate_reward"))
-                evaluate.save_results(os.path.join(output, "validate_reward"))
+                if not os.path.exists(os.path.join(output, 'validate_reward')):
+                    os.makedirs(os.path.join(output, 'validate_reward'))
+                evaluate.save_results(os.path.join(output, 'validate_reward'))
 
             print(
-                "[BEST] Step_{:07d}: mean_reward:{} mean_sharpe:{} mean_sortino:{} mean_calmar:{} mean_mdd:{} mean_cum_returns:{}".format(
+                '[BEST] Step_{:07d}: mean_reward:{} mean_sharpe:{} mean_sortino:{} mean_calmar:{} mean_mdd:{} mean_cum_returns:{}'.format(
                     step,
                     best_reward,
                     best_sharpe,
@@ -113,7 +111,7 @@ def train(
                     best_cum_returns,
                 )
             )
-            print("output:", output)
+            print('output:', output)
 
         # update
         step += 1
@@ -123,11 +121,7 @@ def train(
 
         if done:  # end of episode
             if debug:
-                prGreen(
-                    "#{}: episode_reward:{} steps:{}".format(
-                        episode, episode_reward, step
-                    )
-                )
+                prGreen(f'#{episode}: episode_reward:{episode_reward} steps:{step}')
 
             agent.memory.append(
                 observation, agent.select_action(observation), 0.0, False
@@ -152,98 +146,48 @@ def test(num_episodes, agent, env, evaluate, model_path, visualize=True, debug=F
             env, policy, debug=debug, visualize=visualize, save=False
         )
         if debug:
-            prYellow("[Evaluate] #{}: mean_reward:{}".format(i, validate_reward))
+            prYellow(f'[Evaluate] #{i}: mean_reward:{validate_reward}')
 
-if __name__ == "__main__":
+if __name__ == '__main__':
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-    parser = argparse.ArgumentParser(description="PyTorch on TORCS with Multi-modal")
-
-    parser.add_argument(
-        "--mode", default="train", type=str, help="support option: train/test"
-    )
-    parser.add_argument(
-        "--env", default="Humanoid-v2", type=str, help="open-ai gym environment"
-    )
-    parser.add_argument(
-        "--hidden1",
-        default=400,
-        type=int,
-        help="hidden num of first fully connect layer",
-    )
-    parser.add_argument(
-        "--hidden2",
-        default=300,
-        type=int,
-        help="hidden num of second fully connect layer",
-    )
-    parser.add_argument("--rate", default=0.001, type=float, help="learning rate")
-    parser.add_argument(
-        "--prate",
-        default=0.0001,
-        type=float,
-        help="policy net learning rate (only for DDPG)",
-    )
-    parser.add_argument(
-        "--warmup",
-        default=25,
-        type=int,
-        help="time without training but only filling the replay memory",
-    )
-    parser.add_argument("--discount", default=0.99, type=float, help="")
-    parser.add_argument("--bsize", default=1, type=int, help="minibatch size")
-    parser.add_argument("--rmsize", default=25, type=int, help="memory size")
-    parser.add_argument("--window_length", default=1, type=int, help="")
-    parser.add_argument(
-        "--tau", default=0.001, type=float, help="moving average for target network"
-    )
-    parser.add_argument("--ou_theta", default=0.15, type=float, help="noise theta")
-    parser.add_argument("--ou_sigma", default=0.2, type=float, help="noise sigma")
-    parser.add_argument("--ou_mu", default=0.0, type=float, help="noise mu")
-    parser.add_argument(
-        "--validate_episodes",
-        default=1,
-        type=int,
-        help="how many episode to perform during validate experiment",
-    )
-    parser.add_argument("--max_episode_length", default=500, type=int, help="")
-    parser.add_argument(
-        "--validate_steps",
-        default=25,
-        type=int,
-        help="how many steps to perform a validate experiment",
-    )
-    parser.add_argument("--output", default="output", type=str, help="")
-    parser.add_argument("--debug", dest="debug", action="store_true")
-    parser.add_argument("--init_w", default=0.003, type=float, help="")
-    parser.add_argument(
-        "--train_iter", default=200000, type=int, help="train iters each timestep"
-    )
-    parser.add_argument(
-        "--epsilon", default=50000, type=int, help="linear decay of exploration policy"
-    )
-    parser.add_argument("--seed", default=-1, type=int, help="")
-    parser.add_argument(
-        "--resume", default="default", type=str, help="Resuming model path for testing"
-    )
-    parser.add_argument(
-        "--model", default="time", type=str, help="which model to choose <profit, simple, plain>"
-    )
-    parser.add_argument(
-        "--diff",
-        default=None,
-        type=str,
-        help="diff for reward <price, vol, text, price_text, pvt> default: (None)",
-    )
-
+    parser = argparse.ArgumentParser(description='PyTorch on TORCS with Multi-modal')
+    parser.add_argument('--mode', default='train', type=str, help='support option: train/test')
+    parser.add_argument('--env', default='Humanoid-v2', type=str, help='open-ai gym environment')
+    parser.add_argument('--hidden1', default=512, type=int, help='hidden num of first fully connect layer')
+    parser.add_argument('--hidden2', default=256, type=int, help='hidden num of second fully connect layer')
+    parser.add_argument('--rate', default=0.001, type=float, help='learning rate')
+    parser.add_argument('--prate', default=0.0001, type=float, help='policy net learning rate (only for DDPG)')
+    parser.add_argument('--warmup', default=25, type=int, help='time without training but only filling the replay memory')
+    parser.add_argument('--discount', default=0.99, type=float)
+    parser.add_argument('--bsize', default=32, type=int, help='minibatch size')
+    parser.add_argument('--rmsize', default=25, type=int, help='memory size')
+    parser.add_argument('--window_length', default=10000, type=int)
+    parser.add_argument('--tau', default=0.001, type=float, help='moving average for target network')
+    parser.add_argument('--ou_theta', default=0.15, type=float, help='noise theta')
+    parser.add_argument('--ou_sigma', default=0.2, type=float, help='noise sigma')
+    parser.add_argument('--ou_mu', default=0.0, type=float, help='noise mu')
+    parser.add_argument('--validate_episodes', default=1, type=int, help='how many episode to perform during validate experiment')
+    parser.add_argument('--max_episode_length', default=500, type=int)
+    parser.add_argument('--validate_steps', default=25, type=int, help='how many steps to perform a validate experiment')
+    parser.add_argument('--output', default='output', type=str)
+    parser.add_argument('--debug', dest='debug', action='store_true')
+    parser.add_argument('--init_w', default=0.003, type=float)
+    parser.add_argument('--train_iter', default=1000, type=int, help='train iters each timestep')
+    parser.add_argument('--epsilon', default=50000, type=int, help='linear decay of exploration policy')
+    parser.add_argument('--seed', default=42, type=int)
+    parser.add_argument('--resume', default='default', type=str, help='Resuming model path for testing')
+    parser.add_argument('--model', default='profit', type=str, help='which model to choose <profit, simple, plain>')
     args = parser.parse_args()
-    output = get_output_folder(args.output, args.env)
-    if args.resume == "default":
-        resume = "output/{}-run0".format(args.env)
 
-    with open("../data/traindata_ussnp500_rl.pkl", "rb") as f:
+    output = get_output_folder(args.output, args.env)
+    if args.resume == 'default':
+        resume = os.path.join(BASE_DIR, f'output/{args.env}-run0')
+
+    with open(os.path.join(BASE_DIR, 'data/stock_data_train.pkl'), 'rb') as f:
         data_train = pickle.load(f)
 
-    with open("../data/testdata_ussnp500_rl.pkl", "rb") as f:
+    with open(os.path.join(BASE_DIR, 'data/stock_data_test.pkl'), 'rb') as f:
         data_test = pickle.load(f)
 
     env_train = StockEnvTrade(data_train, 0, args)
@@ -260,7 +204,7 @@ if __name__ == "__main__":
         max_episode_length=len(data_test),
     )
 
-    if args.mode == "train":
+    if args.mode == 'train':
         train(
             args.train_iter,
             agent,
@@ -273,7 +217,7 @@ if __name__ == "__main__":
             debug=args.debug,
         )
 
-    elif args.mode == "test":
+    elif args.mode == 'test':
         test(
             args.validate_episodes,
             agent,
@@ -285,4 +229,4 @@ if __name__ == "__main__":
         )
 
     else:
-        raise RuntimeError("undefined mode {}".format(args.mode))
+        raise RuntimeError(f'undefined mode {args.mode}')

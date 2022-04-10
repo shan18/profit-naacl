@@ -2,18 +2,21 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.optim import Adam
+
 from memory import SequentialMemory
 from random_process import OrnsteinUhlenbeckProcess
-from util import *
+from util import soft_update, hard_update, USE_CUDA, to_tensor, to_numpy
+
 
 criterion = nn.MSELoss()
+
 
 class DDPG(object):
     def __init__(self, nb_states, nb_actions, args):
 
         if args.seed > 0:
             self.seed(args.seed)
-        if args.model == "profit": 
+        if args.model == "profit":
             from model import Actor, Critic
         self.nb_states = nb_states
         self.nb_actions = nb_actions
@@ -90,9 +93,7 @@ class DDPG(object):
         # Actor update
         self.actor.zero_grad()
 
-        policy_loss = -self.critic(
-            to_tensor(state_batch), self.actor(to_tensor(state_batch))
-        )
+        policy_loss = -self.critic(to_tensor(state_batch), self.actor(to_tensor(state_batch)))
 
         policy_loss = policy_loss.mean()
         policy_loss.backward()

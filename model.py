@@ -1,11 +1,18 @@
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from ipdb import set_trace as debug
-from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from torch.autograd import Variable
-from configs_stock import *
+from configs_stock import (
+    STOCK_DIM,
+    TWEETS_EMB,
+    FEAT_DIMS,
+    EMB_IDX,
+    LEN_IDX,
+    N_DAYS,
+    MAX_TWEETS,
+    TARGET_IDX,
+    TIME_IDX
+)
 
 device = torch.device("cuda")
 class TimeLSTM(nn.Module):
@@ -79,7 +86,7 @@ class attn(torch.nn.Module):
         lens: B*1
         """
         if self.use_attention:
-            score = self.V(F.tanh(self.W1(last) + self.W2(full)))
+            score = self.V(torch.tanh(self.W1(last) + self.W2(full)))
             # print(score.shape) -> B*30*1
 
             if lens != None:
@@ -209,10 +216,8 @@ class Actor(nn.Module):
         sentence_feat = state[:, EMB_IDX:LEN_IDX].view(
             -1, self.num_stocks, N_DAYS, MAX_TWEETS, TWEETS_EMB
         )
-        len_tweets = state[:,
-                           LEN_IDX:TARGET_IDX].view(-1, self.num_stocks, N_DAYS)
-        time_feats = state[:,
-                           TIME_IDX:].view(-1, self.num_stocks, N_DAYS, MAX_TWEETS)
+        len_tweets = state[:, LEN_IDX:TARGET_IDX].view(-1, self.num_stocks, N_DAYS)
+        time_feats = state[:, TIME_IDX:].view(-1, self.num_stocks, N_DAYS, MAX_TWEETS)
 
         self.bs = sentence_feat.size(0)
         sentence_feat = sentence_feat.permute(1, 2, 0, 3, 4)
@@ -224,17 +229,13 @@ class Actor(nn.Module):
         for i in range(self.num_stocks):
             h_init, c_init = self.init_hidden()
 
-            lstm1_out = torch.zeros(num_days, self.bs, self.lstm1_outshape).to(
-                self.device
-            )
+            lstm1_out = torch.zeros(num_days, self.bs, self.lstm1_outshape).to(self.device)
             for j in range(num_days):
                 temp_sent = sentence_feat[i, j, :, :, :]
                 temp_len = len_tweets[i, j, :]
                 temp_timefeats = time_feats[i, j, :, :]
 
-                temp_lstmout, (_, _) = self.lstm1s[i](
-                    temp_sent, temp_timefeats, (h_init, c_init)
-                )
+                temp_lstmout, (_, _) = self.lstm1s[i](temp_sent, temp_timefeats, (h_init, c_init))
 
                 last_idx = temp_len.type(torch.int).tolist()
                 temp_hn = torch.zeros(self.bs, self.lstm1_outshape).to(self.device)
@@ -273,10 +274,7 @@ class Critic(nn.Module):
         text_embed_dim=TWEETS_EMB,
         intraday_hiddenDim=128,
         interday_hiddenDim=128,
-        intraday_numLayers=1,
         interday_numLayers=1,
-        use_attn1=False,
-        use_attn2=False,
         maxlen=30,
         device=torch.device("cuda"),
     ):
