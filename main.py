@@ -58,7 +58,7 @@ def train(
             agent.update_policy()
 
         # [optional] evaluate
-        if evaluate is not None and validate_steps > 0 and step % validate_steps == 0:
+        if evaluate is not None and validate_steps > 0 and step > 0 and step % validate_steps == 0:
             print('VALIDATING!!! step = ', step)
             agent.is_training = False
             agent.eval()
@@ -154,15 +154,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch on TORCS with Multi-modal')
     parser.add_argument('--mode', default='train', type=str, help='support option: train/test')
     parser.add_argument('--env', default='Humanoid-v2', type=str, help='open-ai gym environment')
-    parser.add_argument('--hidden1', default=512, type=int, help='hidden num of first fully connect layer')
-    parser.add_argument('--hidden2', default=256, type=int, help='hidden num of second fully connect layer')
     parser.add_argument('--rate', default=0.001, type=float, help='learning rate')
     parser.add_argument('--prate', default=0.0001, type=float, help='policy net learning rate (only for DDPG)')
-    parser.add_argument('--warmup', default=25, type=int, help='time without training but only filling the replay memory')
+    parser.add_argument('--warmup', default=64, type=int, help='time without training but only filling the replay memory')
     parser.add_argument('--discount', default=0.99, type=float)
     parser.add_argument('--bsize', default=32, type=int, help='minibatch size')
-    parser.add_argument('--rmsize', default=25, type=int, help='memory size')
-    parser.add_argument('--window_length', default=10000, type=int)
+    parser.add_argument('--rmsize', default=64, type=int, help='memory size')
+    parser.add_argument('--window_length', default=1000, type=int)
     parser.add_argument('--tau', default=0.001, type=float, help='moving average for target network')
     parser.add_argument('--ou_theta', default=0.15, type=float, help='noise theta')
     parser.add_argument('--ou_sigma', default=0.2, type=float, help='noise sigma')

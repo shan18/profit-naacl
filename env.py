@@ -119,12 +119,10 @@ class StockEnvTrade(gym.Env):
                     * TRANSACTION_FEE_PERCENT
                 )
                 self.trades += 1
-            else:
-                pass
 
     def _buy_stock(self, index, action):
         # perform buy action based on the sign of the action
-        if self.turbulence < self.turbulence_threshold:
+        if self.turbulence < self.turbulence_threshold and self.state[index + 1] != 0:
             available_amount = self.state[0] // self.state[index + 1]
             # print('available_amount:{}'.format(available_amount))
             # update balance
@@ -142,9 +140,6 @@ class StockEnvTrade(gym.Env):
                 * TRANSACTION_FEE_PERCENT
             )
             self.trades += 1
-        else:
-            # if turbulence goes over threshold, just stop buying
-            pass
 
     def step(self, actions):
         # print(self.day)
@@ -220,14 +215,12 @@ class StockEnvTrade(gym.Env):
             )
 
             for index in sell_index:
-                if self.state[index + 1] > 0:  # if 0 then hold the stocks
-                    # print('take sell action'.format(actions[index]))
-                    self._sell_stock(index, actions[index])
+                # print('take sell action'.format(actions[index]))
+                self._sell_stock(index, actions[index])
 
             for index in buy_index:
-                if self.state[index + 1] > 0:  # if 0 then hold the stocks
-                    # print('take buy action: {}'.format(actions[index]))
-                    self._buy_stock(index, actions[index])
+                # print('take buy action: {}'.format(actions[index]))
+                self._buy_stock(index, actions[index])
 
             end_total_asset = np.array(self.state[HOLDING_IDX:EMB_IDX]) * np.array(
                 self.state[TARGET_IDX:TIME_IDX]

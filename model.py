@@ -360,6 +360,7 @@ class Critic(nn.Module):
         self.linear_sa1 = nn.Linear(64, 32)
         self.linear_sa2 = nn.Linear(32, 1)
         self.device = device
+
     def init_hidden(self):
         h = Variable(torch.zeros(self.bs, self.lstm1_outshape)).to(self.device)
         c = Variable(torch.zeros(self.bs, self.lstm2_outshape)).to(self.device)
