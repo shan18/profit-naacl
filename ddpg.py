@@ -87,11 +87,11 @@ class DDPG:
         ) = self.memory.sample_and_split(self.batch_size)
 
         # Prepare for the target q batch
-        next_q_values = self.critic_target(
-            to_tensor(next_state_batch, volatile=True),
-            self.actor_target(to_tensor(next_state_batch, volatile=True)),
-        )
-        next_q_values.volatile = False
+        with torch.no_grad():
+            next_q_values = self.critic_target(
+                to_tensor(next_state_batch),
+                self.actor_target(to_tensor(next_state_batch)),
+            )
 
         # Calculate EMA for Q
         if self.decay_q:

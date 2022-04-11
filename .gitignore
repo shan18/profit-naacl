@@ -10,3 +10,4 @@ data/tweet
 *.csv
 data/data_archive
 results/
+output

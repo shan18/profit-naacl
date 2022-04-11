@@ -3,8 +3,7 @@ import torch
 from torch.autograd import Variable
 
 
-USE_CUDA = torch.cuda.is_available()
-FLOAT = torch.cuda.FloatTensor if USE_CUDA else torch.FloatTensor
+DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 
 def prRed(prt):
@@ -40,13 +39,11 @@ def prBlack(prt):
 
 
 def to_numpy(var):
-    return var.cpu().data.numpy() if USE_CUDA else var.data.numpy()
+    return var.cpu().data.numpy() if DEVICE == 'cuda' else var.data.numpy()
 
 
-def to_tensor(ndarray, volatile=False, requires_grad=False, dtype=FLOAT):
-    return Variable(
-        torch.from_numpy(ndarray), volatile=volatile, requires_grad=requires_grad
-    ).type(dtype)
+def to_tensor(ndarray):
+    return torch.tensor(ndarray, dtype=torch.float32).to(DEVICE)
 
 
 def soft_update(target, source, tau):

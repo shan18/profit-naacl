@@ -92,7 +92,7 @@ class attn(torch.nn.Module):
 
             if lens != None:
                 mask = self.arange[None, :] < lens[:, None]  # B*30
-                score[~mask] = float("-inf")
+                score[~mask] = 0
 
             attention_weights = F.softmax(score, dim=dim)
             context_vector = attention_weights * full
