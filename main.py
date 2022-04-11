@@ -55,7 +55,7 @@ def train(
         # agent observe and update policy
         agent.observe(reward, observation2, done)
         if step > args.warmup:
-            agent.update_policy()
+            agent.update_policy(step - args.warmup)
 
         # [optional] evaluate
         if evaluate is not None and validate_steps > 0 and step > 0 and step % validate_steps == 0:
@@ -154,13 +154,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch on TORCS with Multi-modal')
     parser.add_argument('--mode', default='train', type=str, help='support option: train/test')
     parser.add_argument('--env', default='Humanoid-v2', type=str, help='open-ai gym environment')
-    parser.add_argument('--rate', default=0.001, type=float, help='learning rate')
-    parser.add_argument('--prate', default=0.0001, type=float, help='policy net learning rate (only for DDPG)')
-    parser.add_argument('--warmup', default=64, type=int, help='time without training but only filling the replay memory')
+    parser.add_argument('--rate', default=0.00007, type=float, help='learning rate')
+    parser.add_argument('--prate', default=0.00007, type=float, help='policy net learning rate (only for DDPG)')
+    parser.add_argument('--warmup', default=25, type=int, help='time without training but only filling the replay memory')
     parser.add_argument('--discount', default=0.99, type=float)
-    parser.add_argument('--bsize', default=32, type=int, help='minibatch size')
-    parser.add_argument('--rmsize', default=64, type=int, help='memory size')
-    parser.add_argument('--window_length', default=1000, type=int)
+    parser.add_argument('--bsize', default=1, type=int, help='minibatch size')
+    parser.add_argument('--rmsize', default=25, type=int, help='memory size')
+    parser.add_argument('--window_length', default=1, type=int)
     parser.add_argument('--tau', default=0.001, type=float, help='moving average for target network')
     parser.add_argument('--ou_theta', default=0.15, type=float, help='noise theta')
     parser.add_argument('--ou_sigma', default=0.2, type=float, help='noise sigma')
@@ -176,7 +176,12 @@ if __name__ == '__main__':
     parser.add_argument('--seed', default=42, type=int)
     parser.add_argument('--resume', default='default', type=str, help='Resuming model path for testing')
     parser.add_argument('--model', default='profit', type=str, help='which model to choose <profit, simple, plain>')
+    parser.add_argument('--decay_q', action='store_true', help='use q as a linearly decaying average')
+    parser.add_argument('--temporal_gamma', action='store_true', help='use temporal discounting')
     args = parser.parse_args()
+
+    if args.decay_q and args.temporal_gamma:
+        raise ValueError('cannot use both decay_q and temporal_gamma')
 
     output = get_output_folder(args.output, args.env)
     if args.resume == 'default':

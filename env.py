@@ -3,6 +3,7 @@ from configs_stock import (
     TIME_IDX, LAST_PRICE_IDX, TRANSACTION_FEE_PERCENT, REWARD_SCALING, HMAX_NORMALIZE
 )
 from empyrical import sharpe_ratio, max_drawdown, calmar_ratio, sortino_ratio
+import torch
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -18,7 +19,7 @@ matplotlib.use("Agg")
 class StockEnvTrade(gym.Env):
     """A stock trading environment for OpenAI gym"""
 
-    metadata = {"render.modes": ["human"]}
+    metadata = {'render.modes': ['human']}
 
     def __init__(
         self,
@@ -28,17 +29,17 @@ class StockEnvTrade(gym.Env):
         turbulence_threshold=140,
         initial=True,
         previous_state=[],
-        model_name="",
-        iteration="",
+        model_name='',
+        iteration='',
     ):
         """
         all_data: list containing the dataset.
         day: the date on which the agent will start trading.
-        last_day: last_day in the dataset.
         """
 
         self.args = args
-        self.day = day
+        self.initial_day = day
+        self.day = self.initial_day
         self.all_data = all_data
         self.data = self.all_data[self.day]
         self.initial = initial
@@ -53,11 +54,11 @@ class StockEnvTrade(gym.Env):
         self.turbulence_threshold = turbulence_threshold
 
         # initalize state
-        last_price = self.data["adj_close_last"].view(-1).tolist()
-        target_price = self.data["adj_close_target"].view(-1).tolist()
-        len_data = self.data["length_data"].view(-1).tolist()
-        emb_data = self.data["embedding"].view(-1).tolist()
-        time_feats = self.data["time_features"].view(-1).tolist()
+        last_price = self.data['adj_close_last'].view(-1).tolist()
+        target_price = self.data['adj_close_target'].view(-1).tolist()
+        len_data = self.data['length_data'].view(-1).tolist()
+        emb_data = self.data['embedding'].view(-1).tolist()
+        time_feats = self.data['time_features'].view(-1).tolist()
         self.state = (
             [INITIAL_ACCOUNT_BALANCE]  # balance
             + last_price  # stock prices initial
@@ -147,56 +148,48 @@ class StockEnvTrade(gym.Env):
         # print(actions)
 
         if self.terminal:
-            print("Reached the end.")
-            if not os.path.exists("results"):
-                os.makedirs("results")
-            plt.plot(self.asset_memory, "r")
-            plt.savefig(
-                "results/account_value_trade_{}_{}.png".format(
-                    self.model_name, self.iteration
-                )
-            )
+            print('Reached the end.')
+            if not os.path.exists('results'):
+                os.makedirs('results')
+            plt.plot(self.asset_memory, 'r')
+            plt.savefig(f'results/account_value_trade_{self.model_name}_{self.iteration}.png')
             plt.close()
             df_total_value = pd.DataFrame(self.asset_memory)
-            df_total_value.to_csv(
-                "results/account_value_trade_{}_{}.csv".format(
-                    self.model_name, self.iteration
-                )
-            )
+            df_total_value.to_csv(f'results/account_value_trade_{self.model_name}_{self.iteration}.csv')
             end_total_asset = self.state[0] + sum(
                 np.array(self.state[HOLDING_IDX:EMB_IDX]) * np.array(self.state[TARGET_IDX:TIME_IDX])
             )
-            print("previous_total_asset:{}".format(self.asset_memory[0]))
+            print(f'previous_total_asset:{self.asset_memory[0]}')
 
-            print("end_total_asset:{}".format(end_total_asset))
-            print("total_reward:{}".format(end_total_asset - self.asset_memory[0]))
-            print("total_cost: ", self.cost)
-            print("total trades: ", self.trades)
+            print(f'end_total_asset:{end_total_asset}')
+            print(f'total_reward:{end_total_asset - self.asset_memory[0]}')
+            print('total_cost: ', self.cost)
+            print('total trades: ', self.trades)
 
-            df_total_value.columns = ["account_value"]
-            df_total_value["daily_return"] = df_total_value.pct_change(1)
+            df_total_value.columns = ['account_value']
+            df_total_value['daily_return'] = df_total_value.pct_change(1)
 
             cum_returns = (
                 (end_total_asset - self.asset_memory[0]) / (self.asset_memory[0])
             ) * 100
-            sharpe = sharpe_ratio(df_total_value["daily_return"])
-            sortino = sortino_ratio(df_total_value["daily_return"])
-            calmar = calmar_ratio(df_total_value["daily_return"])
-            mdd = max_drawdown(df_total_value["daily_return"]) * 100
+            sharpe = sharpe_ratio(df_total_value['daily_return'])
+            sortino = sortino_ratio(df_total_value['daily_return'])
+            calmar = calmar_ratio(df_total_value['daily_return'])
+            mdd = max_drawdown(df_total_value['daily_return']) * 100
 
             df_rewards = pd.DataFrame(self.rewards_memory)
-            df_rewards.to_csv(f"results/account_rewards_trade_{self.model_name}_{self.iteration}.csv")
+            df_rewards.to_csv(f'results/account_rewards_trade_{self.model_name}_{self.iteration}.csv')
 
             return (
                 self.state,
                 self.reward,
                 self.terminal,
                 {
-                    "sharpe": sharpe,
-                    "sortino": sortino,
-                    "calmar": calmar,
-                    "mdd": mdd,
-                    "cum_returns": cum_returns,
+                    'sharpe': sharpe,
+                    'sortino': sortino,
+                    'calmar': calmar,
+                    'mdd': mdd,
+                    'cum_returns': cum_returns,
                 },
             )
 
@@ -235,11 +228,11 @@ class StockEnvTrade(gym.Env):
             self.day += 1
             self.data = self.all_data[self.day]
 
-            last_price = self.data["adj_close_last"].view(-1).tolist()
-            target_price = self.data["adj_close_target"].view(-1).tolist()
-            len_data = self.data["length_data"].view(-1).tolist()
-            emb_data = self.data["embedding"].view(-1).tolist()
-            time_feats = self.data["time_features"].view(-1).tolist()
+            last_price = self.data['adj_close_last'].view(-1).tolist()
+            target_price = self.data['adj_close_target'].view(-1).tolist()
+            len_data = self.data['length_data'].view(-1).tolist()
+            emb_data = self.data['embedding'].view(-1).tolist()
+            time_feats = self.data['time_features'].view(-1).tolist()
             self.state = (
                 [self.state[0]]  # balance
                 + last_price  # stock prices initial
@@ -255,7 +248,7 @@ class StockEnvTrade(gym.Env):
     def reset(self):
         if self.initial:
             self.asset_memory = [INITIAL_ACCOUNT_BALANCE]
-            self.day = 0
+            self.day = self.initial_day
             self.data = self.all_data[self.day]
             self.turbulence = 0
             self.cost = 0
@@ -264,11 +257,11 @@ class StockEnvTrade(gym.Env):
             # self.iteration=self.iteration
             self.rewards_memory = []
             # initiate state
-            last_price = self.data["adj_close_last"].view(-1).tolist()
-            target_price = self.data["adj_close_target"].view(-1).tolist()
-            len_data = self.data["length_data"].view(-1).tolist()
-            emb_data = self.data["embedding"].view(-1).tolist()
-            time_feats = self.data["time_features"].view(-1).tolist()
+            last_price = self.data['adj_close_last'].view(-1).tolist()
+            target_price = self.data['adj_close_target'].view(-1).tolist()
+            len_data = self.data['length_data'].view(-1).tolist()
+            emb_data = self.data['embedding'].view(-1).tolist()
+            time_feats = self.data['time_features'].view(-1).tolist()
             self.state = (
                 [INITIAL_ACCOUNT_BALANCE]  # balance
                 + last_price  # stock prices initial
@@ -285,7 +278,7 @@ class StockEnvTrade(gym.Env):
             )
             self.asset_memory = [previous_total_asset]
             # self.asset_memory = [self.previous_state[0]]
-            self.day = 0
+            self.day = self.initial_day
             self.data = self.all_data[self.day]
             self.turbulence = 0
             self.cost = 0
@@ -293,11 +286,11 @@ class StockEnvTrade(gym.Env):
             self.terminal = False
             # self.iteration=iteration
             self.rewards_memory = []
-            last_price = self.data["adj_close_last"].view(-1).tolist()
-            target_price = self.data["adj_close_target"].view(-1).tolist()
-            len_data = self.data["length_data"].view(-1).tolist()
-            emb_data = self.data["embedding"].view(-1).tolist()
-            time_feats = self.data["time_features"].view(-1).tolist()
+            last_price = self.data['adj_close_last'].view(-1).tolist()
+            target_price = self.data['adj_close_target'].view(-1).tolist()
+            len_data = self.data['length_data'].view(-1).tolist()
+            emb_data = self.data['embedding'].view(-1).tolist()
+            time_feats = self.data['time_features'].view(-1).tolist()
             self.state = (
                 [self.previous_state[0]]  # balance
                 + last_price  # stock prices initial
@@ -311,7 +304,7 @@ class StockEnvTrade(gym.Env):
 
         return self.state
 
-    def render(self, mode="human", close=False):
+    def render(self, mode='human', close=False):
         return self.state
 
     def _seed(self, seed=None):

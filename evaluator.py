@@ -7,7 +7,7 @@ from util import prYellow
 
 
 class Evaluator(object):
-    def __init__(self, num_episodes, interval, save_path="", max_episode_length=None):
+    def __init__(self, num_episodes, interval, save_path='', max_episode_length=None):
         self.num_episodes = num_episodes
         self.max_episode_length = max_episode_length
         self.interval = interval
@@ -49,7 +49,7 @@ class Evaluator(object):
                     done = True
 
                 if visualize:
-                    env.render(mode="human")
+                    env.render(mode='human')
 
                 # update
                 episode_reward += reward
@@ -58,17 +58,17 @@ class Evaluator(object):
 
             if debug:
                 prYellow(
-                    "[Evaluate] #Episode{}: episode_reward:{}".format(
+                    '[Evaluate] #Episode{}: episode_reward:{}'.format(
                         episode, episode_reward
                     )
                 )
 
             result.append(episode_reward)
-            sortino.append(info["sortino"])
-            calmar.append(info["calmar"])
-            sharpe.append(info["sharpe"])
-            mdd.append(info["mdd"])
-            cum_returns.append(info["cum_returns"])
+            sortino.append(info['sortino'])
+            calmar.append(info['calmar'])
+            sharpe.append(info['sharpe'])
+            mdd.append(info['mdd'])
+            cum_returns.append(info['cum_returns'])
 
         self.asset_memory = env.asset_memory
 
@@ -87,10 +87,10 @@ class Evaluator(object):
 
     def save_results(self, fn):
         fig, ax = plt.subplots(1, 1, figsize=(6, 5))
-        plt.xlabel("Timestep")
-        plt.ylabel("Asset_Value")
-        plt.plot(self.asset_memory, "r")
-        plt.savefig(os.path.join(fn, "asset_value.png"))
-        with open(os.path.join(fn, "asset_value.pkl"), "wb") as f:
+        plt.xlabel('Timestep')
+        plt.ylabel('Asset_Value')
+        plt.plot(self.asset_memory, 'r')
+        plt.savefig(os.path.join(fn, 'asset_value.png'))
+        with open(os.path.join(fn, 'asset_value.pkl'), 'wb') as f:
             pkl.dump(self.asset_memory, f)
         plt.close()

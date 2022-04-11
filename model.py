@@ -14,17 +14,17 @@ from configs_stock import (
     TIME_IDX
 )
 
-device = torch.device("cuda")
+
 class TimeLSTM(nn.Module):
-    def __init__(self, input_size, hidden_size, cuda_flag=False, bidirectional=False):
+    def __init__(self, input_size, hidden_size, bidirectional=False):
         super(TimeLSTM, self).__init__()
         self.hidden_size = hidden_size
         self.input_size = input_size
-        self.cuda_flag = cuda_flag
         self.W_all = nn.Linear(hidden_size, hidden_size * 4)
         self.U_all = nn.Linear(input_size, hidden_size * 4)
         self.W_d = nn.Linear(hidden_size, hidden_size)
         self.bidirectional = bidirectional
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     def forward(self, inputs, timestamps, hidden_states, reverse=False):
 
@@ -32,9 +32,8 @@ class TimeLSTM(nn.Module):
         h = hidden_states[0]
         c = hidden_states[1]
 
-        if self.cuda_flag:
-            h = h.cuda()
-            c = c.cuda()
+        h = h.to(self.device)
+        c = c.to(self.device)
         outputs = []
         hidden_state_h = []
         hidden_state_c = []
@@ -68,16 +67,18 @@ class TimeLSTM(nn.Module):
 
         return outputs, (h, c)
 
+
 class attn(torch.nn.Module):
     def __init__(self, in_shape, use_attention=True, maxlen=None):
         super(attn, self).__init__()
         self.use_attention = use_attention
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         if self.use_attention:
-            self.W1 = torch.nn.Linear(in_shape, in_shape).to(device)
-            self.W2 = torch.nn.Linear(in_shape, in_shape).to(device)
-            self.V = torch.nn.Linear(in_shape, 1).to(device)
+            self.W1 = torch.nn.Linear(in_shape, in_shape).to(self.device)
+            self.W2 = torch.nn.Linear(in_shape, in_shape).to(self.device)
+            self.V = torch.nn.Linear(in_shape, 1).to(self.device)
         if maxlen != None:
-            self.arange = torch.arange(maxlen).to(device)
+            self.arange = torch.arange(maxlen).to(self.device)
 
     def forward(self, full, last, lens=None, dim=1):
         """
@@ -100,7 +101,7 @@ class attn(torch.nn.Module):
         else:
             if lens != None:
                 mask = self.arange[None, :] < lens[:, None]  # B*30
-                mask = mask.type(torch.float).unsqueeze(-1).cuda()
+                mask = mask.type(torch.float).unsqueeze(-1).to(self.device)
                 context_vector = full * mask
                 context_vector = torch.mean(context_vector, dim=dim)
                 return context_vector
@@ -118,14 +119,12 @@ class Actor(nn.Module):
         self,
         num_stocks=STOCK_DIM,
         text_embed_dim=TWEETS_EMB,
-        intraday_hiddenDim=128,
-        interday_hiddenDim=128,
+        intraday_hiddenDim=64,
+        interday_hiddenDim=64,
         intraday_numLayers=1,
         interday_numLayers=1,
-        use_attn1=False,
-        use_attn2=False,
         maxlen=30,
-        device=torch.device("cuda"),
+        device='cuda' if torch.cuda.is_available() else 'cpu',
     ):
         """
         num_stocks: number of stocks for which the agent is trading
@@ -141,7 +140,7 @@ class Actor(nn.Module):
         ]
 
         for i, tweet_lstm in enumerate(self.lstm1s):
-            self.add_module("lstm1_{}".format(i), tweet_lstm)
+            self.add_module('lstm1_{}'.format(i), tweet_lstm)
 
         self.lstm1_outshape = intraday_hiddenDim
         self.lstm2_outshape = interday_hiddenDim
@@ -152,7 +151,7 @@ class Actor(nn.Module):
         ]
 
         for i, tweet_attn in enumerate(self.attn1s):
-            self.add_module("attn1_{}".format(i), tweet_attn)
+            self.add_module('attn1_{}'.format(i), tweet_attn)
 
         self.lstm2s = [
             nn.LSTM(
@@ -165,7 +164,7 @@ class Actor(nn.Module):
             for _ in range(num_stocks)
         ]
         for i, day_lstm in enumerate(self.lstm2s):
-            self.add_module("lstm2_{}".format(i), day_lstm)
+            self.add_module('lstm2_{}'.format(i), day_lstm)
 
         self.attn2s = [
             attn(self.lstm2_outshape)
@@ -173,19 +172,19 @@ class Actor(nn.Module):
         ]
 
         for i, day_attn in enumerate(self.attn2s):
-            self.add_module("attn2_{}".format(i), day_attn)
+            self.add_module('attn2_{}'.format(i), day_attn)
 
         self.linearx1 = [
             nn.Linear(self.lstm2_outshape, self.lstm2_outshape)
             for _ in range(num_stocks)
         ]
         for i, linear_x in enumerate(self.linearx1):
-            self.add_module("linearx1_{}".format(i), linear_x)
+            self.add_module('linearx1_{}'.format(i), linear_x)
 
         self.linearx2 = [nn.Linear(self.lstm2_outshape, 64)
                          for _ in range(num_stocks)]
         for i, linear_x in enumerate(self.linearx2):
-            self.add_module("linearx2_{}".format(i), linear_x)
+            self.add_module('linearx2_{}'.format(i), linear_x)
 
         self.drop = nn.Dropout(p=0.3)
         self.softmax1 = nn.Softmax(dim=2)
@@ -276,7 +275,7 @@ class Critic(nn.Module):
         interday_hiddenDim=128,
         interday_numLayers=1,
         maxlen=30,
-        device=torch.device("cuda"),
+        device='cuda' if torch.cuda.is_available() else 'cpu',
     ):
         """
         num_stocks: number of stocks for which the agent is trading
@@ -292,7 +291,7 @@ class Critic(nn.Module):
         ]
 
         for i, tweet_lstm in enumerate(self.lstm1s):
-            self.add_module("lstm1_{}".format(i), tweet_lstm)
+            self.add_module('lstm1_{}'.format(i), tweet_lstm)
 
         self.lstm1_outshape = intraday_hiddenDim
         self.lstm2_outshape = interday_hiddenDim
@@ -303,7 +302,7 @@ class Critic(nn.Module):
         ]
 
         for i, tweet_attn in enumerate(self.attn1s):
-            self.add_module("attn1_{}".format(i), tweet_attn)
+            self.add_module('attn1_{}'.format(i), tweet_attn)
 
         self.lstm2s = [
             nn.LSTM(
@@ -316,7 +315,7 @@ class Critic(nn.Module):
             for _ in range(num_stocks)
         ]
         for i, day_lstm in enumerate(self.lstm2s):
-            self.add_module("lstm2_{}".format(i), day_lstm)
+            self.add_module('lstm2_{}'.format(i), day_lstm)
 
         self.attn2s = [
             attn(self.lstm2_outshape)
@@ -324,19 +323,19 @@ class Critic(nn.Module):
         ]
 
         for i, day_attn in enumerate(self.attn2s):
-            self.add_module("attn2_{}".format(i), day_attn)
+            self.add_module('attn2_{}'.format(i), day_attn)
 
         self.linearx1 = [
             nn.Linear(self.lstm2_outshape, self.lstm2_outshape)
             for _ in range(num_stocks)
         ]
         for i, linear_x in enumerate(self.linearx1):
-            self.add_module("linearx1_{}".format(i), linear_x)
+            self.add_module('linearx1_{}'.format(i), linear_x)
 
         self.linearx2 = [nn.Linear(self.lstm2_outshape, 64)
                          for _ in range(num_stocks)]
         for i, linear_x in enumerate(self.linearx2):
-            self.add_module("linearx2_{}".format(i), linear_x)
+            self.add_module('linearx2_{}'.format(i), linear_x)
 
         self.drop = nn.Dropout(p=0.3)
         self.tanh = nn.Tanh()
