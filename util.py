@@ -6,36 +6,12 @@ from torch.autograd import Variable
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 
-def prRed(prt):
-    print(f'\033[91m {prt}\033[00m')
-
-
 def prGreen(prt):
     print(f'\033[92m {prt}\033[00m')
 
 
 def prYellow(prt):
     print(f'\033[93m {prt}\033[00m')
-
-
-def prLightPurple(prt):
-    print(f'\033[94m {prt}\033[00m')
-
-
-def prPurple(prt):
-    print(f'\033[95m {prt}\033[00m')
-
-
-def prCyan(prt):
-    print(f'\033[96m {prt}\033[00m')
-
-
-def prLightGray(prt):
-    print(f'\033[97m {prt}\033[00m')
-
-
-def prBlack(prt):
-    print(f'\033[98m {prt}\033[00m')
 
 
 def to_numpy(var):
@@ -56,8 +32,16 @@ def hard_update(target, source):
         target_param.data.copy_(param.data)
 
 
-def get_output_folder(parent_dir, env_name):
+def get_output_folder(parent_dir, env_name, log_dir=None):
     os.makedirs(parent_dir, exist_ok=True)
+
+    if log_dir is not None and not os.path.exists(os.path.join(parent_dir, log_dir)):
+        parent_dir = os.path.join(parent_dir, log_dir)
+        os.makedirs(parent_dir, exist_ok=True)
+        return parent_dir
+    else:
+        print('Invalid log dir given, creating a new one with another name.')
+
     experiment_id = 0
     for folder_name in os.listdir(parent_dir):
         if not os.path.isdir(os.path.join(parent_dir, folder_name)):

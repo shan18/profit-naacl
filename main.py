@@ -22,7 +22,7 @@ def train(
 ):
 
     agent.is_training = True
-    step = episode = episode_steps = 0
+    episode = episode_steps = 0
     episode_reward = 0.0
     best_sharpe = -99999
     best_reward = -99999
@@ -32,8 +32,7 @@ def train(
     best_cum_returns = -99999
 
     observation = None
-    pbar = tqdm(total=num_iterations)
-    while step < num_iterations:
+    for step in tqdm(range(num_iterations)):
 
         # reset if it is the start of episode
         if observation is None:
@@ -77,15 +76,13 @@ def train(
             agent.is_training = True
 
             print(
-                '[Evaluate] Step_{:07d}: mean_reward:{} mean_sharpe:{} mean_sortino:{} mean_calmar:{} mean_mdd:{} mean_cum_returns:{}'.format(
-                    step,
-                    validate_reward,
-                    validate_sharpe,
-                    validate_sortino,
-                    validate_calmar,
-                    validate_mdd,
-                    validate_cum_returns,
-                )
+                f'[Evaluate] Step_{step:07d}:'
+                f'mean_reward:{validate_reward}'
+                f'mean_sharpe:{validate_sharpe}'
+                f'mean_sortino:{validate_sortino}'
+                f'mean_calmar:{validate_calmar}'
+                f'mean_mdd:{validate_mdd}'
+                f'mean_cum_returns:{validate_cum_returns}'
             )
             if validate_sharpe > best_sharpe:
                 print('saving model!!!!')
@@ -101,20 +98,17 @@ def train(
                 evaluate.save_results(os.path.join(output, 'validate_reward'))
 
             print(
-                '[BEST] Step_{:07d}: mean_reward:{} mean_sharpe:{} mean_sortino:{} mean_calmar:{} mean_mdd:{} mean_cum_returns:{}'.format(
-                    step,
-                    best_reward,
-                    best_sharpe,
-                    best_sortino,
-                    best_calmar,
-                    best_mdd,
-                    best_cum_returns,
-                )
+                f'[BEST] Step_{step:07d}:'
+                f'mean_reward:{best_reward}'
+                f'mean_sharpe:{best_sharpe}'
+                f'mean_sortino:{best_sortino}'
+                f'mean_calmar:{best_calmar}'
+                f'mean_mdd:{best_mdd}'
+                f'mean_cum_returns:{best_cum_returns}'
             )
             print('output:', output)
 
         # update
-        step += 1
         episode_steps += 1
         episode_reward += reward
         observation = deepcopy(observation2)
@@ -123,16 +117,13 @@ def train(
             if debug:
                 prGreen(f'#{episode}: episode_reward:{episode_reward} steps:{step}')
 
-            agent.memory.append(
-                observation, agent.select_action(observation), 0.0, False
-            )
+            agent.memory.append(observation, agent.select_action(observation), 0.0, False)
 
             # reset
             observation = None
             episode_steps = 0
             episode_reward = 0.0
             episode += 1
-        pbar.update(1)
 
 def test(num_episodes, agent, env, evaluate, model_path, visualize=True, debug=False):
 
@@ -152,15 +143,15 @@ if __name__ == '__main__':
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
     parser = argparse.ArgumentParser(description='PyTorch on TORCS with Multi-modal')
-    parser.add_argument('--mode', default='train', type=str, help='support option: train/test')
-    parser.add_argument('--env', default='Humanoid-v2', type=str, help='open-ai gym environment')
+    parser.add_argument('--mode', default='train', help='support option: train/test')
+    parser.add_argument('--env', default='Humanoid-v2', help='open-ai gym environment')
     parser.add_argument('--rate', default=0.00007, type=float, help='learning rate')
     parser.add_argument('--prate', default=0.00007, type=float, help='policy net learning rate (only for DDPG)')
     parser.add_argument('--warmup', default=25, type=int, help='time without training but only filling the replay memory')
     parser.add_argument('--discount', default=0.99, type=float)
-    parser.add_argument('--bsize', default=8, type=int, help='minibatch size')
+    parser.add_argument('--bsize', default=1, type=int, help='minibatch size')
     parser.add_argument('--rmsize', default=25, type=int, help='memory size')
-    parser.add_argument('--window_length', default=7, type=int)
+    parser.add_argument('--window_length', default=1, type=int)
     parser.add_argument('--tau', default=0.001, type=float, help='moving average for target network')
     parser.add_argument('--ou_theta', default=0.15, type=float, help='noise theta')
     parser.add_argument('--ou_sigma', default=0.2, type=float, help='noise sigma')
@@ -174,18 +165,19 @@ if __name__ == '__main__':
     parser.add_argument('--train_iter', default=1000, type=int, help='train iters each timestep')
     parser.add_argument('--epsilon', default=50000, type=int, help='linear decay of exploration policy')
     parser.add_argument('--seed', default=42, type=int)
-    parser.add_argument('--resume', default='default', type=str, help='Resuming model path for testing')
-    parser.add_argument('--model', default='profit', type=str, help='which model to choose <profit, simple, plain>')
+    parser.add_argument('--resume', default=None, help='Resuming model path for testing')
+    parser.add_argument('--model', default='profit', help='which model to choose <profit, simple, plain>')
     parser.add_argument('--decay_q', action='store_true', help='use q as a linearly decaying average')
     parser.add_argument('--temporal_gamma', action='store_true', help='use temporal discounting')
+    parser.add_argument('--result', default=os.path.join(BASE_DIR, 'results'), help='path to save results')
+    parser.add_argument('--log', default=None, help='directory name containing output and results')
     args = parser.parse_args()
 
     if args.decay_q and args.temporal_gamma:
         raise ValueError('cannot use both decay_q and temporal_gamma')
 
-    output = get_output_folder(args.output, args.env)
-    if args.resume == 'default':
-        resume = os.path.join(BASE_DIR, f'output/{args.env}-run0')
+    args.output = get_output_folder(args.output, args.env, log_dir=args.log)
+    args.result = get_output_folder(args.result, args.env, log_dir=args.log)
 
     with open(os.path.join(BASE_DIR, 'data/stock_data_train.pkl'), 'rb') as f:
         data_train = pickle.load(f)
@@ -193,8 +185,8 @@ if __name__ == '__main__':
     with open(os.path.join(BASE_DIR, 'data/stock_data_test.pkl'), 'rb') as f:
         data_test = pickle.load(f)
 
-    env_train = StockEnvTrade(data_train, 0, args)
-    env_test = StockEnvTrade(data_test, 0, args)
+    env_train = StockEnvTrade(data_train, 0, args, log_suffix='train')
+    env_test = StockEnvTrade(data_test, 0, args, log_suffix='test')
 
     nb_states = env_train.observation_space.shape[0]
     nb_actions = env_train.action_space.shape[0]
@@ -203,7 +195,7 @@ if __name__ == '__main__':
     evaluate = Evaluator(
         args.validate_episodes,
         args.validate_steps,
-        output,
+        args.output,
         max_episode_length=len(data_test),
     )
 
@@ -215,18 +207,21 @@ if __name__ == '__main__':
             env_test,
             evaluate,
             args.validate_steps,
-            output,
+            args.output,
             max_episode_length=len(data_train),
             debug=args.debug,
         )
 
     elif args.mode == 'test':
+        if not os.path.exists(args.resume):
+            raise ValueError('Invalid model path for testing.')
+
         test(
             args.validate_episodes,
             agent,
             env_test,
             evaluate,
-            resume,
+            args.resume,
             visualize=True,
             debug=args.debug,
         )

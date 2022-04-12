@@ -3,7 +3,6 @@ from configs_stock import (
     TIME_IDX, LAST_PRICE_IDX, TRANSACTION_FEE_PERCENT, REWARD_SCALING, HMAX_NORMALIZE
 )
 from empyrical import sharpe_ratio, max_drawdown, calmar_ratio, sortino_ratio
-import torch
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -29,8 +28,7 @@ class StockEnvTrade(gym.Env):
         turbulence_threshold=140,
         initial=True,
         previous_state=[],
-        model_name='',
-        iteration='',
+        log_suffix='',
     ):
         """
         all_data: list containing the dataset.
@@ -44,6 +42,7 @@ class StockEnvTrade(gym.Env):
         self.data = self.all_data[self.day]
         self.initial = initial
         self.previous_state = previous_state
+        self.result_dir = args.result
 
         # action_space normalization and shape is STOCK_DIM
         self.action_space = spaces.Box(low=-1, high=1, shape=(STOCK_DIM,))
@@ -80,8 +79,7 @@ class StockEnvTrade(gym.Env):
         self.rewards_memory = []
         # self.reset()
         self._seed()
-        self.model_name = model_name
-        self.iteration = iteration
+        self.log_suffix = log_suffix
 
     def _sell_stock(self, index, action):
         # perform sell action based on the sign of the action
@@ -149,13 +147,11 @@ class StockEnvTrade(gym.Env):
 
         if self.terminal:
             print('Reached the end.')
-            if not os.path.exists('results'):
-                os.makedirs('results')
             plt.plot(self.asset_memory, 'r')
-            plt.savefig(f'results/account_value_trade_{self.model_name}_{self.iteration}.png')
+            plt.savefig(os.path.join(self.result_dir, f'account_value_trade_{self.log_suffix}.png'))
             plt.close()
             df_total_value = pd.DataFrame(self.asset_memory)
-            df_total_value.to_csv(f'results/account_value_trade_{self.model_name}_{self.iteration}.csv')
+            df_total_value.to_csv(os.path.join(self.result_dir, f'account_value_trade_{self.log_suffix}.csv'))
             end_total_asset = self.state[0] + sum(
                 np.array(self.state[HOLDING_IDX:EMB_IDX]) * np.array(self.state[TARGET_IDX:TIME_IDX])
             )
@@ -178,7 +174,7 @@ class StockEnvTrade(gym.Env):
             mdd = max_drawdown(df_total_value['daily_return']) * 100
 
             df_rewards = pd.DataFrame(self.rewards_memory)
-            df_rewards.to_csv(f'results/account_rewards_trade_{self.model_name}_{self.iteration}.csv')
+            df_rewards.to_csv(os.path.join(self.result_dir, f'account_rewards_trade_{self.log_suffix}.csv'))
 
             return (
                 self.state,
@@ -254,7 +250,6 @@ class StockEnvTrade(gym.Env):
             self.cost = 0
             self.trades = 0
             self.terminal = False
-            # self.iteration=self.iteration
             self.rewards_memory = []
             # initiate state
             last_price = self.data['adj_close_last'].view(-1).tolist()
@@ -284,7 +279,6 @@ class StockEnvTrade(gym.Env):
             self.cost = 0
             self.trades = 0
             self.terminal = False
-            # self.iteration=iteration
             self.rewards_memory = []
             last_price = self.data['adj_close_last'].view(-1).tolist()
             target_price = self.data['adj_close_target'].view(-1).tolist()
